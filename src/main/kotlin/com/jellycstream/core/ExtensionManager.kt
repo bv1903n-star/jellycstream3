@@ -33,31 +33,28 @@ object ExtensionManager {
     fun loadExtensionJar(jarFile: File) {
         val classLoader = URLClassLoader(arrayOf(jarFile.toURI().toURL()), this::class.java.classLoader)
         
-        // Cloudstream 3 plugins often expose their entry point via ServiceLoader
-        // or they have a manifest entry. Let's try both or just scan classes.
-        // Actually, plugins extend CloudstreamPlugin. 
-        // We will read META-INF/services/com.lagradost.cloudstream3.plugins.CloudstreamPlugin if it exists.
-        val services = ServiceLoader.load(CloudstreamPlugin::class.java, classLoader).iterator()
-        
         val loadedProviderNames = mutableListOf<String>()
-        var foundPluginName = jarFile.nameWithoutExtension
+        val foundPluginName = jarFile.nameWithoutExtension
 
-        while (services.hasNext()) {
-            val plugin = services.next()
-            println("Loaded CloudstreamPlugin: ${plugin.javaClass.name}")
-            // A plugin usually calls registerMainAPI(provider)
-            // But CloudstreamPlugin context inside JVM might need to be mocked. Let's skip calling plugin.load() for now
-            // and instead directly instantiate MainAPI if we can find it.
+        println("[ExtensionManager] Scanning JAR: ${jarFile.name}")
+
+        val foundProviders = scanJarForProviders(jarFile, classLoader)
+        println("[ExtensionManager] scanJarForProviders found ${foundProviders.size} provider class(es) in ${jarFile.name}")
+
+        foundProviders.forEach { providerClass ->
+            try {
+                val providerInstance = providerClass.getDeclaredConstructor().newInstance() as MainAPI
+                println("[ExtensionManager] Registered provider: '${providerInstance.name}' from class ${providerClass.name}")
+                loadedProviders[providerInstance.name] = providerInstance
+                loadedProviderNames.add(providerInstance.name)
+            } catch (e: Exception) {
+                println("[ExtensionManager] Failed to instantiate provider class ${providerClass.name}: ${e.message}")
+                e.printStackTrace()
+            }
         }
 
-        // Simpler way: we just load any MainAPI exposed via ServiceLoader or scan.
-        // Usually, many scrapers just extend MainAPI directly and some might not be in ServiceLoader.
-        // To be safe, wait, does Cloudstream use ServiceLoader? No, Cloudstream uses android DexFile to scan all classes!
-        // JVM can't run DexFile. We need to scan the JAR file entries using ZipFile.
-        scanJarForProviders(jarFile, classLoader).forEach { providerClass ->
-            val providerInstance = providerClass.getDeclaredConstructor().newInstance() as MainAPI
-            loadedProviders[providerInstance.name] = providerInstance
-            loadedProviderNames.add(providerInstance.name)
+        if (loadedProviderNames.isEmpty()) {
+            println("[ExtensionManager] WARNING: No providers were successfully registered from ${jarFile.name}!")
         }
 
         installedPlugins[foundPluginName] = PluginEntry(
@@ -70,25 +67,36 @@ object ExtensionManager {
 
     private fun scanJarForProviders(jarFile: File, classLoader: URLClassLoader): List<Class<*>> {
         val providers = mutableListOf<Class<*>>()
+        var scannedCount = 0
+        var failedCount = 0
         java.util.zip.ZipFile(jarFile).use { zip ->
             val entries = zip.entries()
             while (entries.hasMoreElements()) {
                 val entry = entries.nextElement()
                 if (entry.name.endsWith(".class")) {
+                    scannedCount++
                     val className = entry.name.replace('/', '.').removeSuffix(".class")
                     try {
                         val cls = classLoader.loadClass(className)
                         if (MainAPI::class.java.isAssignableFrom(cls) && !cls.isInterface && !java.lang.reflect.Modifier.isAbstract(cls.modifiers)) {
+                            println("[ExtensionManager] Found MainAPI subclass: $className")
                             providers.add(cls)
                         }
                     } catch (e: NoClassDefFoundError) {
-                        // ignore classes that fail to load
+                        failedCount++
+                        if (className.contains("Provider", ignoreCase = true)) {
+                            println("[ExtensionManager] NoClassDefFoundError for $className: ${e.message}")
+                        }
                     } catch (e: Exception) {
-                        // ignore
+                        failedCount++
+                        if (className.contains("Provider", ignoreCase = true)) {
+                            println("[ExtensionManager] Error loading $className: ${e.message}")
+                        }
                     }
                 }
             }
         }
+        println("[ExtensionManager] Scan complete: $scannedCount classes scanned, $failedCount failed to load, ${providers.size} MainAPI found.")
         return providers
     }
 

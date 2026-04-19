@@ -90,6 +90,11 @@ fun Application.configureRouting() {
         }
         
         route("/api") {
+            // Debug endpoint: list all providers currently in memory
+            get("/providers") {
+                val providers = ExtensionManager.getProviders().keys.toList()
+                call.respond(HttpStatusCode.OK, mapOf("count" to providers.size, "providers" to providers))
+            }
             get("/search") {
                 val query = call.request.queryParameters["query"] ?: return@get call.respond(HttpStatusCode.BadRequest, ErrorResponse("query missing"))
                 val providerName = call.request.queryParameters["provider"] ?: return@get call.respond(HttpStatusCode.BadRequest, ErrorResponse("provider missing"))
