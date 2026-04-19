@@ -1,0 +1,13 @@
+version: "3.8"
+services:
+  cstream-bridge:
+    build: .
+    container_name: jelly-cstream-bridge
+    ports:
+      - "3018:8080"
+    volumes:
+      - ./extensions:/app/extensions
+      - ./db:/app/db
+    restart: unless-stopped
+    environment:
+      - TZ=Asia/Jakarta

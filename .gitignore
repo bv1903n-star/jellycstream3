@@ -1,0 +1,12 @@
+.gradle
+build
+/db
+/extensions
+*.jar
+*.xml
+*.json
+!build.gradle.kts
+!settings.gradle.kts
+.DS_Store
+.idea
+*.log
