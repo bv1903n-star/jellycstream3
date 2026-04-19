@@ -93,7 +93,7 @@ fun Application.configureRouting() {
             // Debug endpoint: list all providers currently in memory
             get("/providers") {
                 val providers = ExtensionManager.getProviders().keys.toList()
-                call.respond(HttpStatusCode.OK, mapOf("count" to providers.size, "providers" to providers))
+                call.respond(HttpStatusCode.OK, ProvidersResponse(count = providers.size, providers = providers))
             }
             get("/search") {
                 val query = call.request.queryParameters["query"] ?: return@get call.respond(HttpStatusCode.BadRequest, ErrorResponse("query missing"))
@@ -124,8 +124,7 @@ fun Application.configureRouting() {
                 
                 try {
                     val result = provider.load(url)
-                    // Simplify response for now
-                    call.respond(HttpStatusCode.OK, mapOf("name" to result?.name, "url" to result?.url))
+                    call.respond(HttpStatusCode.OK, LoadResultSchema(name = result?.name, url = result?.url))
                 } catch (e: Exception) {
                     call.respond(HttpStatusCode.InternalServerError, ErrorResponse(e.message ?: "Load execution failed"))
                 }
@@ -137,20 +136,20 @@ fun Application.configureRouting() {
                 val provider = ExtensionManager.getProvider(providerName) ?: return@get call.respond(HttpStatusCode.NotFound, ErrorResponse("Provider not found"))
                 
                 try {
-                    val links = mutableListOf<Map<String, String>>()
-                    val subs = mutableListOf<Map<String, String>>()
+                    val links = mutableListOf<LinkItem>()
+                    val subs = mutableListOf<SubtitleItem>()
                     
                     provider.loadLinks(url, isCasting = false, subtitleCallback = { sub ->
-                        subs.add(mapOf("url" to sub.url, "lang" to sub.lang))
+                        subs.add(SubtitleItem(url = sub.url, lang = sub.lang))
                     }, callback = { link ->
-                        links.add(mapOf(
-                            "url" to link.url, 
-                            "name" to link.name,
-                            "type" to "quality" // simplified
+                        links.add(LinkItem(
+                            url = link.url,
+                            name = link.name,
+                            type = "quality"
                         ))
                     })
                     
-                    call.respond(HttpStatusCode.OK, mapOf("links" to links, "subtitles" to subs))
+                    call.respond(HttpStatusCode.OK, LinksResultSchema(links = links, subtitles = subs))
                 } catch (e: Exception) {
                     call.respond(HttpStatusCode.InternalServerError, ErrorResponse(e.message ?: "Links execution failed"))
                 }
