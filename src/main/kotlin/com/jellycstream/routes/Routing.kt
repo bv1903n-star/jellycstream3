@@ -102,7 +102,7 @@ fun Application.configureRouting() {
                 val provider = ExtensionManager.getProvider(providerName) ?: return@get call.respond(HttpStatusCode.NotFound, ErrorResponse("Provider not found"))
                 
                 try {
-                    val result = provider.search(query)
+                    val result = ExtensionManager.safeSearch(provider, query)
                     val mappedResult = result?.map { 
                         SearchResultSchema(
                             name = it.name,

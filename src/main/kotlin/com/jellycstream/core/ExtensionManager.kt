@@ -108,4 +108,35 @@ object ExtensionManager {
     }
     
     fun getInstalledPlugins(): Map<String, PluginEntry> = installedPlugins
+
+    suspend fun safeSearch(provider: MainAPI, query: String): List<com.lagradost.cloudstream3.SearchResponse>? {
+        // Strategy 1: Simple search(query)
+        try {
+            val result = provider.search(query)
+            println("[ExtensionManager] search(query) succeeded for '${provider.name}'")
+            return result
+        } catch (e: NotImplementedError) {
+            println("[ExtensionManager] search(query) not implemented for '${provider.name}', trying search(query, page)...")
+        }
+
+        // Strategy 2: Paginated search(query, page)
+        try {
+            val result = provider.search(query, 1, null)
+            println("[ExtensionManager] search(query, page) succeeded for '${provider.name}'")
+            return result
+        } catch (e: NotImplementedError) {
+            println("[ExtensionManager] search(query, page) not implemented for '${provider.name}', trying quickSearch...")
+        }
+
+        // Strategy 3: quickSearch(query)
+        try {
+            val result = provider.quickSearch(query)
+            println("[ExtensionManager] quickSearch(query) succeeded for '${provider.name}'")
+            return result
+        } catch (e: NotImplementedError) {
+            println("[ExtensionManager] quickSearch(query) also not implemented for '${provider.name}'")
+        }
+
+        return null
+    }
 }
