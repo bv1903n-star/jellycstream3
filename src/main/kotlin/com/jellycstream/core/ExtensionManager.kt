@@ -104,14 +104,46 @@ object ExtensionManager {
     fun getProviders(): Map<String, MainAPI> = loadedProviders
 
     fun getProvider(name: String): MainAPI? {
-        // Return exactly matched or first match containing the string
         return loadedProviders[name] ?: loadedProviders.values.firstOrNull { it.name.contains(name, ignoreCase = true) }
     }
     
     fun getInstalledPlugins(): Map<String, PluginEntry> = installedPlugins
 
+    /**
+     * Safely extracts a List<SearchResponse> from whatever the search() method returns.
+     * This handles the case where SearchResponseList is a custom class (not a java.util.List)
+     * in different versions of the Cloudstream library compiled by different providers.
+     */
+    private fun extractSearchItems(rawResult: Any?): List<SearchResponse> {
+        if (rawResult == null) return emptyList()
+
+        // Case 1: Already a standard List
+        if (rawResult is List<*>) return rawResult.filterIsInstance<SearchResponse>()
+
+        // Case 2: Implements Iterable (but not List)
+        if (rawResult is Iterable<*>) return rawResult.filterIsInstance<SearchResponse>()
+
+        // Case 3: Custom class wrapping a list - use reflection to find the internal collection
+        val fieldsToCheck = rawResult.javaClass.declaredFields.toList() +
+                (rawResult.javaClass.superclass?.declaredFields?.toList() ?: emptyList())
+
+        for (field in fieldsToCheck) {
+            try {
+                field.isAccessible = true
+                val value = field.get(rawResult)
+                if (value is Iterable<*>) {
+                    val items = value.filterIsInstance<SearchResponse>()
+                    if (items.isNotEmpty()) return items
+                }
+            } catch (_: Exception) {}
+        }
+
+        println("[ExtensionManager] WARNING: Could not extract items from ${rawResult.javaClass.name}")
+        return emptyList()
+    }
+
     suspend fun safeSearch(provider: MainAPI, query: String): List<SearchResponse>? {
-        // Strategy 1: Simple search(query)
+        // Strategy 1: Simple search(query) - returns List<SearchResponse>?
         try {
             val result = provider.search(query)
             println("[ExtensionManager] search(query) succeeded for '${provider.name}'")
@@ -120,11 +152,11 @@ object ExtensionManager {
             println("[ExtensionManager] search(query) not implemented for '${provider.name}', trying search(query, page)...")
         }
 
-        // Strategy 2: Paginated search(query, page)
+        // Strategy 2: Paginated search(query, page) - returns SearchResponseList (may not be java.util.List)
         try {
-            @Suppress("UNCHECKED_CAST")
-            val result = provider.search(query, 1) as List<SearchResponse>?
-            println("[ExtensionManager] search(query, page) succeeded for '${provider.name}'")
+            val rawResult: Any? = provider.search(query, 1)
+            val result = extractSearchItems(rawResult)
+            println("[ExtensionManager] search(query, page) succeeded for '${provider.name}' (${result.size} items)")
             return result
         } catch (e: NotImplementedError) {
             println("[ExtensionManager] search(query, page) not implemented for '${provider.name}', trying quickSearch...")
