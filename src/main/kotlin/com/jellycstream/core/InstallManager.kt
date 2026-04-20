@@ -102,4 +102,20 @@ object InstallManager {
         val bytes = response.body<ByteArray>()
         destFile.writeBytes(bytes)
     }
+
+    /**
+     * Uninstalls a plugin by name (JAR filename without extension).
+     * Delegates to ExtensionManager to clean up memory + disk, then removes the DB record.
+     * Returns true if the plugin was found and uninstalled.
+     */
+    fun uninstallExtension(pluginName: String): Boolean {
+        val removed = ExtensionManager.uninstallExtension(pluginName)
+        if (removed) {
+            transaction {
+                InstalledPlugins.deleteWhere { InstalledPlugins.name eq pluginName }
+            }
+            println("[InstallManager] Removed DB record for plugin: '$pluginName'")
+        }
+        return removed
+    }
 }

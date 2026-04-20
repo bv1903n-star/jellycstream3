@@ -84,3 +84,21 @@ data class SearchResultSchema(
 
 @Serializable
 data class ErrorResponse(val error: String)
+
+@Serializable
+data class MessageResponse(val message: String)
+
+@Serializable
+data class ProvidersResponse(val count: Int, val providers: List<String>)
+
+@Serializable
+data class LoadResultSchema(val name: String?, val url: String?)
+
+@Serializable
+data class LinkItem(val url: String, val name: String, val type: String)
+
+@Serializable
+data class SubtitleItem(val url: String, val lang: String)
+
+@Serializable
+data class LinksResultSchema(val links: List<LinkItem>, val subtitles: List<SubtitleItem>)
