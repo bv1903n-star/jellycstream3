@@ -121,7 +121,7 @@ object ExtensionManager {
 
         // Strategy 2: Paginated search(query, page)
         try {
-            val result = provider.search(query, 1, null)
+            val result = provider.search(query, 1)
             println("[ExtensionManager] search(query, page) succeeded for '${provider.name}'")
             return result
         } catch (e: NotImplementedError) {
