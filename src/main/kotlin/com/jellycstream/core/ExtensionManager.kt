@@ -104,10 +104,41 @@ object ExtensionManager {
     fun getProviders(): Map<String, MainAPI> = loadedProviders
 
     fun getProvider(name: String): MainAPI? {
+        // Return exactly matched or first match containing the string
         return loadedProviders[name] ?: loadedProviders.values.firstOrNull { it.name.contains(name, ignoreCase = true) }
     }
-    
+
     fun getInstalledPlugins(): Map<String, PluginEntry> = installedPlugins
+
+    /**
+     * Uninstalls a plugin by its name (JAR filename without extension).
+     * Removes all associated providers from memory and deletes the JAR file from disk.
+     * Returns true if the plugin was found and removed, false if not found.
+     *
+     * NOTE: The `pluginName` parameter must match the JAR filename without extension,
+     * e.g. for "IdlixProvider.jar" use "IdlixProvider".
+     */
+    fun uninstallExtension(pluginName: String): Boolean {
+        val entry = installedPlugins[pluginName] ?: return false
+
+        // 1. Remove all associated providers from memory
+        entry.providers.forEach { providerName ->
+            loadedProviders.remove(providerName)
+            println("[ExtensionManager] Unloaded provider: '$providerName'")
+        }
+
+        // 2. Delete the physical JAR file from disk
+        val jarFile = File(entry.filePath)
+        if (jarFile.exists()) {
+            jarFile.delete()
+            println("[ExtensionManager] Deleted JAR: ${jarFile.absolutePath}")
+        }
+
+        // 3. Remove from memory map
+        installedPlugins.remove(pluginName)
+        println("[ExtensionManager] Uninstalled plugin: '$pluginName'")
+        return true
+    }
 
     /**
      * Safely extracts a List<SearchResponse> from whatever the search() method returns.

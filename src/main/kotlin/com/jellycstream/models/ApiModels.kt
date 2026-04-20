@@ -86,6 +86,9 @@ data class SearchResultSchema(
 data class ErrorResponse(val error: String)
 
 @Serializable
+data class MessageResponse(val message: String)
+
+@Serializable
 data class ProvidersResponse(val count: Int, val providers: List<String>)
 
 @Serializable
