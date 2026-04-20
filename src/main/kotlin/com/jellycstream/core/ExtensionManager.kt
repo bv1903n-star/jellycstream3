@@ -1,6 +1,7 @@
 package com.jellycstream.core
 
 import com.lagradost.cloudstream3.MainAPI
+import com.lagradost.cloudstream3.SearchResponse
 import com.lagradost.cloudstream3.plugins.CloudstreamPlugin
 import java.io.File
 import java.net.URLClassLoader
@@ -109,7 +110,7 @@ object ExtensionManager {
     
     fun getInstalledPlugins(): Map<String, PluginEntry> = installedPlugins
 
-    suspend fun safeSearch(provider: MainAPI, query: String): List<com.lagradost.cloudstream3.SearchResponse>? {
+    suspend fun safeSearch(provider: MainAPI, query: String): List<SearchResponse>? {
         // Strategy 1: Simple search(query)
         try {
             val result = provider.search(query)
@@ -121,7 +122,8 @@ object ExtensionManager {
 
         // Strategy 2: Paginated search(query, page)
         try {
-            val result = provider.search(query, 1)
+            @Suppress("UNCHECKED_CAST")
+            val result = provider.search(query, 1) as List<SearchResponse>?
             println("[ExtensionManager] search(query, page) succeeded for '${provider.name}'")
             return result
         } catch (e: NotImplementedError) {
